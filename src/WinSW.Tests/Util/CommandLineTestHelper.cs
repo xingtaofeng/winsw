@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.ServiceProcess;
 using System.Xml;
 using Xunit;
 
@@ -14,10 +15,12 @@ namespace WinSW.Tests.Util
         public const string Name = "WinSW.Tests";
         public const string DisplayName = "WinSW Test Service";
 
-        internal static readonly string SeedXml =
+        internal static readonly string SeedXml = CreateSeedXml(DisplayName);
+
+        internal static string CreateSeedXml(in string displayName) =>
 $@"<service>
   <id>{Name}</id>
-  <name>{DisplayName}</name>
+  <name>{displayName}</name>
   <executable>cmd.exe</executable>
   <arguments>/c timeout /t -1 /nobreak</arguments>
 </service>";
@@ -105,23 +108,22 @@ $@"<service>
             internal TestXmlServiceConfig(XmlDocument document, string name)
                 : base(document)
             {
-                string directory = this.directory = Path.Combine(Path.GetTempPath(), name);
-                _ = Directory.CreateDirectory(directory);
+                string folder = this.directory = FilesystemTestHelper.CreateTmpDirectory(name);
 
                 try
                 {
-                    string path = this.FullPath = Path.Combine(directory, "config.xml");
+                    string path = this.FullPath = Path.Combine(folder, "config.xml");
                     using (var file = File.CreateText(path))
                     {
                         file.Write(SeedXml);
                     }
 
                     this.BaseName = name;
-                    this.BasePath = Path.Combine(directory, name);
+                    this.BasePath = Path.Combine(folder, name);
                 }
                 catch
                 {
-                    Directory.Delete(directory, true);
+                    Directory.Delete(folder, true);
                     throw;
                 }
             }

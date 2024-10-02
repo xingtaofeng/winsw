@@ -2,7 +2,7 @@
 
 namespace WinSW.Tests.Util
 {
-    internal class FilesystemTestHelper
+    internal static class FilesystemTestHelper
     {
         /// <summary>
         /// Creates a temporary directory for testing.

@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using WinSW.Tests.Util;
 using Xunit;
 
 namespace WinSW.Tests.Extensions
@@ -70,8 +71,7 @@ namespace WinSW.Tests.Extensions
 
             internal static TestData Create([CallerMemberName] string name = null)
             {
-                string path = Path.Combine(Path.GetTempPath(), name);
-                _ = Directory.CreateDirectory(path);
+                string path = FilesystemTestHelper.CreateTmpDirectory(name);
 
                 try
                 {

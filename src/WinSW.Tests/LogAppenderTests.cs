@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using WinSW.Tests.Util;
 using Xunit;
 using static System.IO.File;
 
@@ -126,8 +127,7 @@ namespace WinSW.Tests
 
             internal static TestData Create([CallerMemberName] string name = null)
             {
-                string path = Path.Combine(Path.GetTempPath(), name);
-                _ = Directory.CreateDirectory(path);
+                string path = FilesystemTestHelper.CreateTmpDirectory(name);
 
                 return new(name, path);
             }
