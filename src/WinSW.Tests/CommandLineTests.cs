@@ -17,15 +17,7 @@ namespace WinSW.Tests
 
             try
             {
-                _ = Helper.Test(new[] { "install", config.FullPath }, config);
-
-                using var controller = new ServiceController(Helper.Name);
-                Assert.Equal(Helper.DisplayName, controller.DisplayName);
-                Assert.False(controller.CanStop);
-                Assert.False(controller.CanShutdown);
-                Assert.False(controller.CanPauseAndContinue);
-                Assert.Equal(ServiceControllerStatus.Stopped, controller.Status);
-                Assert.Equal(ServiceType.Win32OwnProcess, controller.ServiceType);
+                using var controller = CommandLineTestsUtils.ExecuteInstall(config);
 
 #if NET
                 InterProcessCodeCoverageSession session = null;
@@ -33,29 +25,11 @@ namespace WinSW.Tests
                 {
                     try
                     {
-                        _ = Helper.Test(new[] { "start", config.FullPath }, config);
-                        controller.Refresh();
-                        Assert.Equal(ServiceControllerStatus.Running, controller.Status);
-                        Assert.True(controller.CanStop);
-
-                        Assert.EndsWith(
-                            ServiceMessages.StartedSuccessfully + Environment.NewLine,
-                            File.ReadAllText(Path.ChangeExtension(config.FullPath, ".wrapper.log")));
-
-                        if (Environment.GetEnvironmentVariable("System.DefinitionId") != null)
-                        {
-                            session = new InterProcessCodeCoverageSession(Helper.Name);
-                        }
+                        session = CommandLineTestsUtils.ExecuteStart(config, controller);
                     }
                     finally
                     {
-                        _ = Helper.Test(new[] { "stop", config.FullPath }, config);
-                        controller.Refresh();
-                        Assert.Equal(ServiceControllerStatus.Stopped, controller.Status);
-
-                        Assert.EndsWith(
-                            ServiceMessages.StoppedSuccessfully + Environment.NewLine,
-                            File.ReadAllText(Path.ChangeExtension(config.FullPath, ".wrapper.log")));
+                        CommandLineTestsUtils.ExecuteStop(config, controller);
                     }
                 }
                 finally
@@ -66,7 +40,7 @@ namespace WinSW.Tests
             }
             finally
             {
-                _ = Helper.Test(new[] { "uninstall", config.FullPath }, config);
+                CommandLineTestsUtils.ExecuteUninstall(config);
             }
         }
 
@@ -115,6 +89,126 @@ namespace WinSW.Tests
             {
                 Program.TestExecutablePath = null;
                 File.Delete(outputPath);
+            }
+        }
+
+        [ElevatedFact]
+        public void RestartConsoleAppTest()
+        {
+            using var config = Helper.TestXmlServiceConfig.FromXml(Helper.SeedXml);
+
+            try
+            {
+                using var controller = CommandLineTestsUtils.ExecuteInstall(config);
+
+#if NET
+                InterProcessCodeCoverageSession session = null;
+                try
+                {
+                    try
+                    {
+                        session = CommandLineTestsUtils.ExecuteStart(config, controller);
+                        session = CommandLineTestsUtils.ExecuteStart(config, controller, true);
+                    }
+                    finally
+                    {
+                        CommandLineTestsUtils.ExecuteStop(config, controller);
+                    }
+                }
+                finally
+                {
+                    session?.Wait();
+                }
+#endif
+            }
+            finally
+            {
+                CommandLineTestsUtils.ExecuteUninstall(config);
+            }
+        }
+
+        [ElevatedFact]
+        public void StatusConsoleAppBeforeAndAfterStartTest()
+        {
+            using var config = Helper.TestXmlServiceConfig.FromXml(Helper.SeedXml);
+
+            try
+            {
+                using var controller = CommandLineTestsUtils.ExecuteInstall(config);
+
+#if NET
+                InterProcessCodeCoverageSession session = null;
+                try
+                {
+                    try
+                    {
+                        Assert.Contains("Inactive (stopped)", CommandLineTestsUtils.ExecuteStatus(config));
+
+                        session = CommandLineTestsUtils.ExecuteStart(config, controller);
+
+                        Assert.Contains("Active (running)", CommandLineTestsUtils.ExecuteStatus(config));
+                    }
+                    finally
+                    {
+                        if (controller.Status == ServiceControllerStatus.Running)
+                        {
+                            CommandLineTestsUtils.ExecuteStop(config, controller);
+                        }
+
+                        Assert.Contains("Inactive (stopped)", CommandLineTestsUtils.ExecuteStatus(config));
+                    }
+                }
+                finally
+                {
+                    session?.Wait();
+                }
+#endif
+            }
+            finally
+            {
+                CommandLineTestsUtils.ExecuteUninstall(config);
+            }
+        }
+
+        [ElevatedFact]
+        public void RefreshConsoleAppTest()
+        {
+            using var config = Helper.TestXmlServiceConfig.FromXml(Helper.SeedXml);
+
+            try
+            {
+                using var controller = CommandLineTestsUtils.ExecuteInstall(config);
+
+                Assert.Equal(Helper.DisplayName, controller.DisplayName);
+
+                var newXml = Helper.CreateSeedXml("This is a test app");
+                using var newConfig = Helper.TestXmlServiceConfig.FromXml(newXml, "RefreshConsoleAppTest_Bis");
+                using var refreshController = CommandLineTestsUtils.ExecuteRefresh(newConfig);
+                Assert.Equal("This is a test app", refreshController.DisplayName);
+            }
+            finally
+            {
+                CommandLineTestsUtils.ExecuteUninstall(config);
+            }
+        }
+
+        [ElevatedFact]
+        public void DevListConsoleAppNotRunTest()
+        {
+            using var config = Helper.TestXmlServiceConfig.FromXml(Helper.SeedXml);
+
+            try
+            {
+                using var controller = CommandLineTestsUtils.ExecuteInstall(config);
+
+                Program.TestExecutablePath = Layout.WinSWExe;
+
+                Assert.Contains($"{config.DisplayName} ({config.Name})", CommandLineTestsUtils.ExecuteDevList());
+            }
+            finally
+            {
+                Program.TestExecutablePath = null;
+                CommandLineTestsUtils.ExecuteUninstall(config);
             }
         }
     }
